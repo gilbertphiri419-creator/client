@@ -40,6 +40,10 @@ export const YourRoute: React.FC<YourRouteProps> = ({ onRouteComplete }) => {
   const [destinationCoords, setDestinationCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [stopCoords, setStopCoords] = useState<({ lat: number; lng: number } | null)[]>([]);
 
+  // Track whether we've already auto-filled pickup from GPS so we never refill
+  // it after the user clears it.
+  const [hasAutoFilledPickup, setHasAutoFilledPickup] = useState(false);
+
   // Debounce timer ref
   const searchTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -48,10 +52,13 @@ export const YourRoute: React.FC<YourRouteProps> = ({ onRouteComplete }) => {
     setSuggestions(getRecentAddresses());
   }, []);
 
-  // Reverse geocode current location to get proper address
+  // Reverse geocode current location to get proper address.
+  // Only auto-fill when real GPS coordinates are confirmed (not null) and we
+  // have not auto-filled before. Once the user clears the field we never refill.
   useEffect(() => {
     const reverseGeocodeLocation = async () => {
-      if (geoLat && geoLng && !pickup) {
+      if (geoLat !== null && geoLng !== null && !pickup && !hasAutoFilledPickup) {
+        setHasAutoFilledPickup(true);
         const result = await reverseGeocode(geoLat, geoLng);
         if (result) {
           setPickup(result.address);
@@ -63,7 +70,7 @@ export const YourRoute: React.FC<YourRouteProps> = ({ onRouteComplete }) => {
       }
     };
     reverseGeocodeLocation();
-  }, [geoLat, geoLng, currentLocation, pickup]);
+  }, [geoLat, geoLng, currentLocation, pickup, hasAutoFilledPickup]);
 
   useEffect(() => {
     // Handle navigation state from SelectRide page
@@ -474,13 +481,13 @@ export const YourRoute: React.FC<YourRouteProps> = ({ onRouteComplete }) => {
                 value={pickup}
                 onChange={(e) => handleInputChange(e.target.value)}
                 onFocus={() => handleFieldFocus('pickup')}
-                placeholder={locationLoading ? 'Getting your location...' : getPlaceholder('pickup')}
+                placeholder={(locationLoading || geoLat === null) ? 'Detecting location...' : getPlaceholder('pickup')}
                 className={`w-full bg-gray-100 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-500 focus:outline-none transition-all ${
                   isFieldActive('pickup') 
                     ? 'ring-2 ring-[#5B2EFF] bg-white shadow-lg shadow-[#5B2EFF]/20 border-2 border-[#5B2EFF]' 
                     : 'focus:ring-2 focus:ring-[#5B2EFF] focus:bg-white'
                 }`}
-                disabled={locationLoading}
+                disabled={locationLoading || geoLat === null}
               />
               {pickup && activeField === 'pickup' && (
                 <button

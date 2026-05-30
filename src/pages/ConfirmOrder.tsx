@@ -88,7 +88,8 @@ export const ConfirmOrder: React.FC<ConfirmOrderProps> = ({
     destinationAddress,
     rideData,
     pickupCoords,
-    destinationCoords
+    destinationCoords,
+    stopCoords = []
   } = location.state || {};
 
   // Use explicit serviceType from navigation if provided, otherwise infer
@@ -294,11 +295,13 @@ export const ConfirmOrder: React.FC<ConfirmOrderProps> = ({
       storeId: orderData.storeId || '',
       storeName: orderData.storeName || '',
       
-      // Stops
-      stops: (finalStops || []).map((stop: string) => ({
-        address: stop,
-        lat: 0,
-        lng: 0,
+      // Stops - use real coordinates. For ride flows the stops are address
+      // strings paired with stopCoords; for store deliveries each stop is an
+      // object that already carries its own lat/lng.
+      stops: (finalStops || []).map((stop: any, index: number) => ({
+        address: typeof stop === 'string' ? stop : (stop?.address || ''),
+        lat: (typeof stop === 'object' && stop?.lat) ? stop.lat : (stopCoords[index]?.lat ?? 0),
+        lng: (typeof stop === 'object' && stop?.lng) ? stop.lng : (stopCoords[index]?.lng ?? 0),
       })),
       
       // Legacy fields for backward compatibility
@@ -395,6 +398,9 @@ export const ConfirmOrder: React.FC<ConfirmOrderProps> = ({
             pickupAddress: finalPickup || pickupAddress,
             destinationAddress: finalDestination || destinationAddress,
             stops: finalStops,
+            stopCoords,
+            pickupCoords,
+            destinationCoords,
             vehicleCategory: isRide ? rideData?.vehicleCategory : (vehicle?.id || vehicle?.name || orderData.deliveryMode?.id),
             vehicleTitle: isRide ? rideData?.name : (vehicle?.name || orderData.deliveryMode?.label),
             price: isRide ? rideData?.estimatedPrice : (vehicle?.price || orderData.totalPrice),
@@ -460,7 +466,7 @@ export const ConfirmOrder: React.FC<ConfirmOrderProps> = ({
         <MapLibreMap
           center={pickupCoords?.lat && pickupCoords?.lng 
             ? { lat: pickupCoords.lat, lng: pickupCoords.lng } 
-            : { lat: -15.3875, lng: 28.3228 }}
+            : { lat: -26.2041, lng: 28.0473 }}
           zoom={14}
           markers={mapMarkers}
           pickupEta={isRide ? parseInt(rideData?.eta?.replace(' min', '') || '2') : 2}

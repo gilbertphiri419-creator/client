@@ -1,13 +1,5 @@
-
 import { useState, useEffect } from 'react';
 import { reverseGeocode as geoapifyReverseGeocode } from '../services/geoapifyService';
-
-// Default location: Lusaka, Zambia (fallback when geolocation fails)
-const DEFAULT_LOCATION = {
-  lat: -15.3875,
-  lng: 28.3228,
-  address: 'Lusaka, Zambia'
-};
 
 interface GeolocationState {
   latitude: number | null;
@@ -59,38 +51,24 @@ export const useGeolocation = () => {
       }
     };
 
-    const handleError = async (error: GeolocationPositionError) => {
-      console.warn('Geolocation error, using default location:', error.message);
-      
-      // Use default Lusaka location when geolocation fails
-      try {
-        const address = await reverseGeocodeLocation(DEFAULT_LOCATION.lat, DEFAULT_LOCATION.lng);
-        setLocation({
-          latitude: DEFAULT_LOCATION.lat,
-          longitude: DEFAULT_LOCATION.lng,
-          address,
-          loading: false,
-          error: null
-        });
-      } catch {
-        setLocation({
-          latitude: DEFAULT_LOCATION.lat,
-          longitude: DEFAULT_LOCATION.lng,
-          address: DEFAULT_LOCATION.address,
-          loading: false,
-          error: null
-        });
-      }
+    const handleError = (error: GeolocationPositionError) => {
+      console.warn('Geolocation unavailable:', error.message);
+      setLocation({
+        latitude: null,
+        longitude: null,
+        address: null,
+        loading: false,
+        error: error.message
+      });
     };
 
     if (!navigator.geolocation) {
-      // Fallback to default location
       setLocation({
-        latitude: DEFAULT_LOCATION.lat,
-        longitude: DEFAULT_LOCATION.lng,
-        address: DEFAULT_LOCATION.address,
+        latitude: null,
+        longitude: null,
+        address: null,
         loading: false,
-        error: null
+        error: 'Geolocation not supported'
       });
       return;
     }

@@ -285,7 +285,7 @@ const createArrivalCard = (arrivalTime: string): HTMLElement => {
 };
 
 export const MapLibreMap: React.FC<MapLibreMapProps> = ({
-  center = { lat: -15.3875, lng: 28.3228 }, // Default to Lusaka, Zambia
+  center = { lat: -26.2041, lng: 28.0473 }, // Default to Johannesburg, South Africa
   zoom = 13,
   markers = [],
   polyline: encodedPolyline,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, PanInfo, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { X, Plus, Calendar, User, Briefcase, ChevronDown, RefreshCw, Users } from 'lucide-react';
 import { useGlobalCart } from '../contexts/GlobalCartContext';
@@ -49,6 +49,7 @@ const DeliverySkeletonCard: React.FC<{ index: number }> = ({ index }) => (
 
 export function FoodDelivery() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { cart, getKgRange } = useGlobalCart();
 
   // Load data from localStorage (from FoodiesRoute)
@@ -70,6 +71,7 @@ export function FoodDelivery() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedOption, setSelectedOption] = useState<BackendRideOption | null>(null);
+  const [routePolyline, setRoutePolyline] = useState<string | null>(null);
 
   const [selectedFilter, setSelectedFilter] = useState<FilterTab>('standard');
   const [profileToggle, setProfileToggle] = useState<'personal' | 'business'>('personal');
@@ -138,17 +140,33 @@ export function FoodDelivery() {
       return;
     }
 
+    // Require real delivery coordinates - no coordinate offset hacks
+    if (!deliveryCoords?.lat || !deliveryCoords?.lng) {
+      setError('Delivery address coordinates missing. Please re-enter the delivery address.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const kgRange = getKgRange();
-      
+
+      // Build stops array with their real coordinates from routeData
+      const stopsPayload = (routeData?.stops || [])
+        .filter((s: any) => s.address)
+        .map((s: any) => ({
+          address: s.address,
+          lat: s.lat ?? 0,
+          lng: s.lng ?? 0,
+        }));
+
       const payload: Record<string, unknown> = {
         pickup: storeAddress || 'Store',
         destination: deliveryLocation || 'Destination',
-        stops: stops.map((s: any) => s.address).filter(Boolean),
+        stops: stopsPayload,
         pickupLat: storeLocation.lat,
         pickupLng: storeLocation.lng,
-        dropLat: deliveryCoords?.lat || storeLocation.lat + 0.01, // Offset if no destination coords
-        dropLng: deliveryCoords?.lng || storeLocation.lng + 0.01,
+        dropLat: deliveryCoords.lat,
+        dropLng: deliveryCoords.lng,
         serviceType: serviceType,
         category: category,
         kg: kgRange
@@ -175,6 +193,7 @@ export function FoodDelivery() {
       const firstEnabled = enrichedOptions.find((x: BackendRideOption) => x.enabled);
       if (firstEnabled) {
         setSelectedOption(firstEnabled);
+        setRoutePolyline(firstEnabled?.encodedPolyline ?? null);
       }
     } catch (err) {
       console.error('[v0] Failed to load delivery options:', err);
@@ -184,19 +203,20 @@ export function FoodDelivery() {
     }
   }, [routeData, cart, deliveryLocation, stops, serviceType, category, getKgRange]);
 
-  // Ref to prevent duplicate fetches
-  const hasFetchedRef = useRef(false);
-
-  // Fetch on mount - SINGLE API CALL
+  // Re-fetch on every navigation to this page so the backend is called fresh
+  // each time (e.g. returning after changing the delivery address or stops).
   useEffect(() => {
-    if (hasFetchedRef.current) return;
-    hasFetchedRef.current = true;
     loadDeliveryOptions();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key]);
+
+  // Keep the drawn route polyline in sync with the currently selected option
+  useEffect(() => {
+    setRoutePolyline(selectedOption?.encodedPolyline ?? null);
+  }, [selectedOption]);
 
   // Retry function
   const handleRetry = useCallback(() => {
-    hasFetchedRef.current = false;
     loadDeliveryOptions();
   }, [loadDeliveryOptions]);
 
@@ -385,14 +405,14 @@ export function FoodDelivery() {
       });
     }
     
-    // TODO: Add destination coords when available
-    // For now use a fixed offset from store
-    if (storeLocation?.lat && storeLocation?.lng) {
+    // Use the real delivery coordinates when available (no offset hack)
+    const deliveryCoords = routeData?.deliveryCoords;
+    if (deliveryCoords?.lat && deliveryCoords?.lng) {
       markers.push({
         id: 'dropoff',
         type: 'dropoff',
-        lat: storeLocation.lat + 0.01,
-        lng: storeLocation.lng + 0.01
+        lat: deliveryCoords.lat,
+        lng: deliveryCoords.lng
       });
     }
     
@@ -414,9 +434,10 @@ export function FoodDelivery() {
         <MapLibreMap
           center={routeData?.storeLocation?.lat && routeData?.storeLocation?.lng 
             ? { lat: routeData.storeLocation.lat, lng: routeData.storeLocation.lng } 
-            : { lat: -15.3875, lng: 28.3228 }}
+            : { lat: -26.2041, lng: 28.0473 }}
           zoom={13}
           markers={mapMarkers}
+          polyline={routePolyline ?? undefined}
           pickupEta={selectedOption?.enabled ? selectedOption.eta : undefined}
           arrivalTime={selectedOption?.enabled ? getArrivalTime() || undefined : undefined}
           fitBounds={mapMarkers.length > 1}

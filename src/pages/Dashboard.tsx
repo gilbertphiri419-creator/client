@@ -25,10 +25,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSearchSelect }) => {
   const maxPanelHeight = 600;
   const minPanelHeight = 175;
 
-  // Load real recent addresses from localStorage (saved via Geoapify)
+  // Load real recent addresses from localStorage (saved via Geoapify).
+  // Uses the same key/source as YourRoute via getRecentAddresses().
   useEffect(() => {
-    const addresses = getRecentAddresses();
-    setRecentAddresses(addresses);
+    setRecentAddresses(getRecentAddresses());
+  }, []);
+
+  // Keep the dashboard's recent addresses in sync if they are saved from
+  // another page during the same session.
+  useEffect(() => {
+    const handleStorage = () => setRecentAddresses(getRecentAddresses());
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
   const handleNavigationBlock = (destination: string) => {
@@ -121,7 +129,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSearchSelect }) => {
       {/* Real MapLibre Map Background */}
       <div className="absolute inset-0 z-0">
         <MapLibreMap
-          center={latitude && longitude ? { lat: latitude, lng: longitude } : { lat: -15.3875, lng: 28.3228 }}
+          center={latitude && longitude ? { lat: latitude, lng: longitude } : { lat: -26.2041, lng: 28.0473 }}
           zoom={13}
           fitBounds={false}
           className="w-full h-full"

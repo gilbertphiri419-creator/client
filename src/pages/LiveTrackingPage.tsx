@@ -145,6 +145,7 @@ export const LiveTrackingPage: React.FC = () => {
   const [statusTitle, setStatusTitle] = useState<string>('Driver is on the way');
   const [statusSubtitle, setStatusSubtitle] = useState<string>('Tracking your delivery');
   const [showRatingModal, setShowRatingModal] = useState<boolean>(false);
+  const [routePolyline, setRoutePolyline] = useState<string | null>(null);
   const driverListenerRef = useRef<(() => void) | null>(null);
 
   // Listen to order document in real-time
@@ -167,6 +168,11 @@ export const LiveTrackingPage: React.FC = () => {
         // Update driver location from order document
         if (data.driverLocation) {
           setDriverLocation(data.driverLocation);
+        }
+
+        // Read the encoded trip route polyline from the order document
+        if ((data as any).polyline) {
+          setRoutePolyline((data as any).polyline);
         }
 
         // IMPORTANT: Read driver info from the order document's "driverSnapshot" field
@@ -368,9 +374,10 @@ export const LiveTrackingPage: React.FC = () => {
             ? { lat: driverLocation.lat, lng: driverLocation.lng }
             : orderData.storeLocation?.lat && orderData.storeLocation?.lng 
               ? { lat: orderData.storeLocation.lat, lng: orderData.storeLocation.lng } 
-              : { lat: -15.3875, lng: 28.3228 }}
+              : { lat: -26.2041, lng: 28.0473 }}
           zoom={14}
           markers={mapMarkers}
+          polyline={routePolyline ?? undefined}
           driverPosition={driverLocation || undefined}
           storePosition={orderData.storeLocation || undefined}
           pickupEta={getEtaMinutes()}

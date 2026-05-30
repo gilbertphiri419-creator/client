@@ -388,7 +388,7 @@ export const DriverComing: React.FC<DriverComingProps> = ({
         <MapLibreMap
           center={driverLocation || (orderData?.pickupCoords?.lat && orderData?.pickupCoords?.lng 
             ? { lat: orderData.pickupCoords.lat, lng: orderData.pickupCoords.lng } 
-            : { lat: -15.3875, lng: 28.3228 })}
+            : { lat: -26.2041, lng: 28.0473 })}
           zoom={14}
           markers={mapMarkers}
           driverPosition={driverLocation || undefined}

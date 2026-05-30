@@ -22,7 +22,7 @@ interface Stop {
 export function FoodiesRoute() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { address: currentLocation, latitude: geoLat, longitude: geoLng } = useGeolocation();
+  const { address: currentLocation, latitude: geoLat, longitude: geoLng, loading: locationLoading } = useGeolocation();
   const { cart, removeFromCart } = useGlobalCart();
 
   const currentLocationInputRef = useRef<HTMLInputElement>(null);
@@ -123,15 +123,19 @@ export function FoodiesRoute() {
     }, 300);
   }, [searchForAddresses]);
 
+  // Only auto-fill the delivery location from GPS when real coordinates are
+  // confirmed (not null). Once auto-filled (or once the user clears it) we never
+  // refill, so the user can rub it off and type their own address.
   useEffect(() => {
-    if (currentLocation && !deliveryLocation && !hasAutoFilled) {
+    if (geoLat !== null && geoLng !== null && currentLocation && !deliveryLocation && !hasAutoFilled) {
       setDeliveryLocation(currentLocation);
       setCurrentLocationQuery(currentLocation);
+      setDeliveryCoords({ lat: geoLat, lng: geoLng });
       setHasAutoFilled(true);
     } else if (deliveryLocation && !currentLocationQuery) {
       setCurrentLocationQuery(deliveryLocation);
     }
-  }, [currentLocation, deliveryLocation, hasAutoFilled, currentLocationQuery]);
+  }, [geoLat, geoLng, currentLocation, deliveryLocation, hasAutoFilled, currentLocationQuery]);
 
 
   useEffect(() => {
@@ -155,6 +159,7 @@ export function FoodiesRoute() {
     setCurrentLocationQuery(value);
     setDeliveryLocation(value);
     setShowRecentAddresses(value.length === 0);
+    handleSearchDebounce(value);
   };
 
   const handleCurrentLocationSelect = (address: string) => {
@@ -186,6 +191,7 @@ export function FoodiesRoute() {
     ));
     setStopAddressQuery(prev => ({ ...prev, [stopId]: value }));
     setShowRecentAddresses(value.length === 0);
+    handleSearchDebounce(value);
   };
 
   const handleStopAddressSelect = (stopId: string, address: string, description: string) => {
@@ -286,6 +292,7 @@ export function FoodiesRoute() {
     
     const routeData = {
       deliveryLocation,
+      deliveryCoords, // The selected delivery address coordinates
       storeId,
       storeName,
       storeAddress,
@@ -295,7 +302,9 @@ export function FoodiesRoute() {
         id: stop.id,
         address: stop.address,
         description: stop.description,
-        foodIds: stop.foodIds
+        foodIds: stop.foodIds,
+        lat: stopCoords[stop.id]?.lat ?? 0, // Real stop latitude
+        lng: stopCoords[stop.id]?.lng ?? 0  // Real stop longitude
       })),
       cart: cart.map(item => ({
         id: item.id,
@@ -416,8 +425,9 @@ export function FoodiesRoute() {
                     setActiveLocationInput('current-location');
                     setShowRecentAddresses(true);
                   }}
-                  placeholder="Delivery location"
-                  className="flex-1 bg-transparent text-gray-900 text-xs outline-none"
+                  placeholder={(locationLoading || geoLat === null) ? 'Detecting location...' : 'Delivery location'}
+                  disabled={locationLoading || geoLat === null}
+                  className="flex-1 bg-transparent text-gray-900 text-xs outline-none disabled:cursor-not-allowed"
                 />
                 {currentLocationQuery && (
                   <motion.button

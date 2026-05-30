@@ -89,6 +89,7 @@ export const SelectRide: React.FC<SelectRideProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedRide, setSelectedRide] = useState<BackendRideOption | null>(null);
+  const [routePolyline, setRoutePolyline] = useState<string | null>(null);
 
   // Promo discount (30%)
   const promoDiscount = 30;
@@ -107,10 +108,19 @@ export const SelectRide: React.FC<SelectRideProps> = ({
     }
 
     try {
+      // Build stops array with their real coordinates from navigation state
+      const navStopCoords = location.state?.stopCoords || [];
+      const navStopsList = location.state?.stops || [];
+      const stopsPayload = navStopsList.map((address: string, index: number) => ({
+        address,
+        lat: navStopCoords[index]?.lat ?? 0,
+        lng: navStopCoords[index]?.lng ?? 0,
+      }));
+
       const payload: Record<string, unknown> = {
         pickup: navPickup || pickup,
         destination: navDestination || destination,
-        stops: navStops.length > 0 ? navStops : stops,
+        stops: stopsPayload,
         pickupLat: pickupCoords.lat,
         pickupLng: pickupCoords.lng,
         dropLat: destinationCoords.lat,
@@ -166,6 +176,7 @@ export const SelectRide: React.FC<SelectRideProps> = ({
       const firstEnabled = enrichedOptions.find((x: BackendRideOption) => x.enabled);
       if (firstEnabled) {
         setSelectedRide(firstEnabled);
+        setRoutePolyline(firstEnabled?.encodedPolyline ?? null);
       }
     } catch (err) {
       console.error('[v0] Failed to load ride options:', err);
@@ -173,24 +184,23 @@ export const SelectRide: React.FC<SelectRideProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [navPickup, pickup, navDestination, destination, navStops, stops, pickupCoords, destinationCoords, serviceType, extraOption, category, kg]);
+  }, [navPickup, pickup, navDestination, destination, navStops, stops, pickupCoords, destinationCoords, serviceType, extraOption, category, kg, location.state]);
 
-  // Ref to prevent duplicate fetches
-  const hasFetchedRef = useRef(false);
-
-  // Fetch on mount - SINGLE API CALL, runs only ONCE
+  // Re-fetch on every navigation to this page (e.g. returning from YourRoute
+  // after changing an address or adding a stop). location.key changes on each
+  // navigation, so the backend is called fresh each time.
   useEffect(() => {
-    // Prevent duplicate requests
-    if (hasFetchedRef.current) return;
-    hasFetchedRef.current = true;
-
     loadRideOptions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [location.key]);
 
-  // Retry function that resets the ref and fetches again
+  // Keep the drawn route polyline in sync with the currently selected ride
+  useEffect(() => {
+    setRoutePolyline(selectedRide?.encodedPolyline ?? null);
+  }, [selectedRide]);
+
+  // Retry function that fetches again
   const handleRetry = useCallback(() => {
-    hasFetchedRef.current = false;
     loadRideOptions();
   }, [loadRideOptions]);
 
@@ -347,7 +357,8 @@ export const SelectRide: React.FC<SelectRideProps> = ({
           destinationAddress: navDestination || destination,
           stops: navStops.length > 0 ? navStops : stops,
           pickupCoords,
-          destinationCoords
+          destinationCoords,
+          stopCoords: location.state?.stopCoords || []
         }
       });
     }
@@ -411,9 +422,10 @@ export const SelectRide: React.FC<SelectRideProps> = ({
         <MapLibreMap
           center={pickupCoords?.lat && pickupCoords?.lng 
             ? { lat: pickupCoords.lat, lng: pickupCoords.lng } 
-            : { lat: -15.3875, lng: 28.3228 }}
+            : { lat: -26.2041, lng: 28.0473 }}
           zoom={13}
           markers={mapMarkers}
+          polyline={routePolyline ?? undefined}
           pickupEta={selectedRide?.enabled ? selectedRide.eta : undefined}
           arrivalTime={selectedRide?.enabled ? getArrivalTime() || undefined : undefined}
           fitBounds={mapMarkers.length > 1}

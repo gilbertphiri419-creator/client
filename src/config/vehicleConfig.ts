@@ -24,6 +24,7 @@ export interface BackendRideOption {
   cargoType?: string;          // e.g., "open", "closed", "refrigerated"
   refrigerationType?: string;  // e.g., "standard", "deep_freeze"
   recommended?: boolean;       // Whether this is the recommended option
+  encodedPolyline?: string | null; // Encoded route polyline for the trip
 }
 
 // Maps backend category to the real vehicle category for dispatching
